@@ -63,6 +63,7 @@ export async function createRouter(
     response.json({ status: 'ok' });
   });
 
+  const internalSonata = config.getBoolean('swf.spinInternalSonataflow');
   const kogitoBaseUrl =
     config.getOptionalString('swf.baseUrl') ?? 'http://localhost';
   const kogitoPort = config.getOptionalNumber('swf.port') ?? 8899;
@@ -115,22 +116,25 @@ export async function createRouter(
     router,
     kogitoBaseUrl,
     kogitoPort,
+    internalSonata,
     workflowService,
     openApiService,
     jiraService,
   );
   setupExternalRoutes(router, discovery);
 
-  await setupKogitoService(
-    kogitoBaseUrl,
-    kogitoPort,
-    kogitoResourcesPath,
-    kogitoServiceContainer,
-    kogitoPersistencePath,
-    jiraHost,
-    jiraBearerToken,
-    logger,
-  );
+  if (internalSonata) {
+    await setupKogitoService(
+      kogitoBaseUrl,
+      kogitoPort,
+      kogitoResourcesPath,
+      kogitoServiceContainer,
+      kogitoPersistencePath,
+      jiraHost,
+      jiraBearerToken,
+      logger,
+    );
+  }
 
   await eventBroker.publish({
     topic: topic,
@@ -148,6 +152,7 @@ function setupInternalRoutes(
   router: express.Router,
   kogitoBaseUrl: string,
   kogitoPort: number,
+  internalSonata: boolean,
   workflowService: WorkflowService,
   openApiService: OpenApiService,
   jiraService: JiraService,
@@ -233,11 +238,15 @@ function setupInternalRoutes(
     res.status(svcResponse.status).json(json);
   });
 
+  const graphqlEndpoint = `${kogitoBaseUrl}: ${
+    internalSonata ? kogitoPort : 8180
+  }/graphql`;
+
   router.get('/instances', async (_, res) => {
     const graphQlQuery =
       '{ ProcessInstances (where: {processId: {isNull: false} } ) { id, processName, processId, state, start, lastUpdate, end, nodes { id }, variables, parentProcessInstance {id, processName, businessKey} } }';
     const svcResponse = await executeWithRetry(() =>
-      fetch(`${kogitoBaseUrl}:${kogitoPort}/graphql`, {
+      fetch(graphqlEndpoint, {
         method: 'POST',
         body: JSON.stringify({ query: graphQlQuery }),
         headers: { 'content-type': 'application/json' },
@@ -255,7 +264,7 @@ function setupInternalRoutes(
     } = req;
     const graphQlQuery = `{ ProcessInstances (where: { id: {equal: "${instanceId}" } } ) { id, processName, processId, state, start, lastUpdate, end, nodes { id, nodeId, definitionId, type, name, enter, exit }, variables, parentProcessInstance {id, processName, businessKey}, error { nodeDefinitionId, message} } }`;
     const svcResponse = await executeWithRetry(() =>
-      fetch(`${kogitoBaseUrl}:${kogitoPort}/graphql`, {
+      fetch(graphqlEndpoint, {
         method: 'POST',
         body: JSON.stringify({ query: graphQlQuery }),
         headers: { 'content-type': 'application/json' },
@@ -274,7 +283,7 @@ function setupInternalRoutes(
     } = req;
     const graphQlQuery = `{ Jobs (where: { processInstanceId: { equal: "${instanceId}" } }) { id, processId, processInstanceId, rootProcessId, status, expirationTime, priority, callbackEndpoint, repeatInterval, repeatLimit, scheduledId, retries, lastUpdate, endpoint, nodeInstanceId, executionCounter } }`;
     const svcResponse = await executeWithRetry(() =>
-      fetch(`${kogitoBaseUrl}:${kogitoPort}/graphql`, {
+      fetch(graphqlEndpoint, {
         method: 'POST',
         body: JSON.stringify({ query: graphQlQuery }),
         headers: { 'content-type': 'application/json' },

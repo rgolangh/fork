@@ -48,7 +48,7 @@ backend:
       - host: example.com
       - host: '*.mozilla.org'
       # kogito Serverless Workflow service
-      - host: localhost:8899
+      - host: localhost:8080
       - host: github.com
   # workingDirectory: /tmp # Use this to configure a working directory for the scaffolder, defaults to the OS temp-dir
 
@@ -190,7 +190,7 @@ allure:
 
 swf:
   baseUrl: http://localhost
-  port: 8899
+  port: 8080
   workflowService:
     path: ../../plugins/swf-backend/workflows
     container: quay.io/kiegroup/kogito-swf-devmode-nightly:main-2023-08-30
@@ -201,6 +201,7 @@ swf:
       bearerToken: ${JIRA_BEARER_TOKEN}
   editor:
     path: https://start.kubesmarts.org
+  spinInternalSonataflow: true
 
 integrations:
   github:
